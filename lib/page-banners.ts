@@ -6,6 +6,7 @@ export type PageBanners = {
   destinations: string | null;
   wishlist: string | null;
   promo: string | null;
+  dashboard: string | null;
 };
 
 /**
@@ -22,5 +23,6 @@ export async function getPageBanners(): Promise<PageBanners> {
     destinations: pick("destinations_banner_image"),
     wishlist: pick("wishlist_banner_image"),
     promo: pick("promo_banner_image"),
+    dashboard: pick("dashboard_banner_image"),
   };
 }

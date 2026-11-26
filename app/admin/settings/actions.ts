@@ -33,6 +33,7 @@ export async function saveSiteSettings(formData: FormData) {
     destinations_banner_image: ((formData.get("destinations_banner_image") as string) || "").trim() || null,
     wishlist_banner_image: ((formData.get("wishlist_banner_image") as string) || "").trim() || null,
     promo_banner_image: ((formData.get("promo_banner_image") as string) || "").trim() || null,
+    dashboard_banner_image: ((formData.get("dashboard_banner_image") as string) || "").trim() || null,
     hero_images: ((formData.get("hero_images") as string) || "")
       .split(",")
       .map((u) => u.trim())
@@ -54,6 +55,7 @@ export async function saveSiteSettings(formData: FormData) {
   revalidatePath("/destinations");
   revalidatePath("/wishlist");
   revalidatePath("/promo");
+  revalidatePath("/admin");
   revalidatePath("/register");
   redirect("/admin/settings?flash=settings-saved");
 }

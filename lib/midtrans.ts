@@ -1,6 +1,7 @@
 import midtransClient from "midtrans-client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendOrderStatusEmail } from "@/lib/email";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 function isProduction() {
   return process.env.MIDTRANS_IS_PRODUCTION === "true";
@@ -111,6 +112,25 @@ export async function applyMidtransStatus(
   midtransOrderId: string,
   tx: MidtransTxStatus
 ): Promise<boolean> {
+  // Transaksi kedaluwarsa / dibatalkan karena pengunjung tidak jadi membayar
+  // (QR atau VA sudah keluar tetapi tidak dibayar): pesanan TIDAK dibatalkan,
+  // melainkan disimpan sebagai DRAF supaya bisa dilanjutkan. Hanya percobaan
+  // bayar SAAT INI yang dihitung; percobaan lama diabaikan.
+  if (tx.transaction_status === "expire" || tx.transaction_status === "cancel") {
+    const isCurrentAttempt = !order.midtrans_order_id || order.midtrans_order_id === midtransOrderId;
+    if (!isCurrentAttempt || order.payment_status !== "pending") return false;
+    const { data: drafted } = await supabase
+      .from("orders")
+      .update({ order_status: "draft" })
+      .eq("id", order.id)
+      .eq("payment_status", "pending")
+      .eq("order_status", "awaiting_payment")
+      .select("id");
+    if (!drafted?.length) return false;
+    await sendOrderStatusEmail(supabase, order.id, "expired");
+    return true;
+  }
+
   const mapped = mapMidtransStatus(tx.transaction_status, tx.fraud_status);
   if (mapped.payment_status === "pending" || mapped.payment_status === order.payment_status) return false;
 
@@ -203,4 +223,25 @@ export async function syncPendingOrdersWithMidtrans(
       }
     })
   );
+}
+
+/**
+ * Pesanan yang sudah lewat 60 menit tanpa pernah membuat transaksi pembayaran
+ * (pengunjung masuk halaman pembayaran lalu pergi) dijadikan DRAF — bukan
+ * dibatalkan. Pesanan yang sudah punya transaksi Midtrans ditangani lewat
+ * status 'expire' dari Midtrans (lihat applyMidtransStatus). Best effort.
+ */
+export async function draftStaleOrders() {
+  try {
+    const admin = createAdminClient();
+    await admin
+      .from("orders")
+      .update({ order_status: "draft" })
+      .eq("order_status", "awaiting_payment")
+      .eq("payment_status", "pending")
+      .is("midtrans_order_id", null)
+      .lt("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString());
+  } catch {
+    // SUPABASE_SERVICE_ROLE_KEY belum diset / migrasi belum dijalankan — lewati.
+  }
 }

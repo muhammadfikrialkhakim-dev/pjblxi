@@ -21,9 +21,9 @@ const COPY: Record<Status, { subject: (c: string) => string; title: string; body
     body: "Pembayaran untuk pesanan ini gagal atau dibatalkan, sehingga pesanan dibatalkan. Silakan buat pesanan baru jika masih ingin berkunjung.",
   },
   expired: {
-    subject: (c) => `Pesanan ${c} kedaluwarsa`,
-    title: "Pesanan kedaluwarsa",
-    body: "Batas waktu pembayaran sudah lewat sehingga pesanan dibatalkan otomatis. Silakan buat pesanan baru jika masih ingin berkunjung.",
+    subject: (c) => `Pesanan ${c} disimpan sebagai draf`,
+    title: "Pesanan disimpan sebagai draf",
+    body: "Pembayaran belum diselesaikan dan batas waktunya sudah lewat, tetapi pesanan Anda tidak dibatalkan — pesanan disimpan sebagai draf. Buka halaman Pesanan Saya dan pilih Lanjutkan Pembayaran selama kuota tanggal kunjungan masih tersedia.",
   },
   refunded: {
     subject: (c) => `Pesanan ${c} direfund`,

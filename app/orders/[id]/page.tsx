@@ -6,6 +6,7 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  FileText,
   MapPin,
   Ticket,
   User,
@@ -14,7 +15,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { syncPendingOrdersWithMidtrans } from "@/lib/midtrans";
+import { draftStaleOrders, syncPendingOrdersWithMidtrans } from "@/lib/midtrans";
 import { formatOrderTime, formatVisitDate } from "@/lib/date";
 import { Order, formatIDR } from "@/lib/types";
 import BookingSteps from "@/components/BookingSteps";
@@ -30,6 +31,7 @@ const STATUS_UI: Record<Order["order_status"], { label: string; badge: string; i
   confirmed: { label: "Terkonfirmasi", badge: "bg-forest-100 text-forest-800", icon: CheckCircle2 },
   completed: { label: "Selesai", badge: "bg-forest-100 text-forest-800", icon: CheckCircle2 },
   cancelled: { label: "Dibatalkan", badge: "bg-red-100 text-red-700", icon: XCircle },
+  draft: { label: "Draf", badge: "bg-slate-100 text-slate-700", icon: FileText },
 };
 
 const METHOD_LABEL: Record<NonNullable<Order["payment_method"]>, string> = {
@@ -42,7 +44,7 @@ const METHOD_LABEL: Record<NonNullable<Order["payment_method"]>, string> = {
 const CANCEL_COPY: Record<string, { title: string; body: string }> = {
   expired: {
     title: "Batas waktu pembayaran habis",
-    body: "Pesanan ini dibatalkan otomatis karena pembayaran tidak diselesaikan tepat waktu. Silakan buat pesanan baru.",
+    body: "Pesanan ini dibatalkan karena pembayaran tidak diselesaikan tepat waktu. Silakan buat pesanan baru.",
   },
   failed: {
     title: "Pembayaran tidak berhasil",
@@ -64,6 +66,8 @@ export default async function OrderDetailPage({
   searchParams?: { justPaid?: string };
 }) {
   const supabase = createClient();
+  // Pesanan yang menggantung >60 menit tanpa transaksi pembayaran -> draf.
+  await draftStaleOrders();
   let { data: order } = await supabase.from("orders").select(ORDER_SELECT).eq("id", params.id).single();
 
   if (!order) notFound();
@@ -89,12 +93,14 @@ export default async function OrderDetailPage({
   const isPaid = o.payment_status === "paid";
   const isCancelled = o.order_status === "cancelled";
   const isAwaiting = o.order_status === "awaiting_payment" && o.payment_status === "pending";
+  // Draf: QR/VA sudah pernah keluar tetapi tidak dibayar — pesanan tetap ada dan bisa dilanjutkan.
+  const isDraft = o.order_status === "draft" && o.payment_status !== "paid";
 
   // Begitu pengunjung baru saja menyelesaikan popup Snap (onSuccess/onPending),
   // sembunyikan dulu form pembayaran dan tampilkan pesan menunggu konfirmasi
   // webhook, supaya tidak terlihat seperti diminta bayar dua kali.
   const justPaid = searchParams?.justPaid === "1";
-  const showPaymentForm = isAwaiting && !justPaid;
+  const showPaymentForm = (isAwaiting || isDraft) && !justPaid;
   const showPendingNotice = isAwaiting && justPaid;
 
   // Metode pembayaran yang diaktifkan Super Admin lewat menu Pengaturan
@@ -176,13 +182,15 @@ export default async function OrderDetailPage({
               {showPaymentForm && (
                 <div className="flex items-center gap-2.5 border-t border-clay-100 bg-clay-50 px-5 py-3 text-sm text-clay-800 sm:px-6">
                   <Clock className="h-4 w-4 shrink-0" aria-hidden />
-                  Selesaikan pembayaran agar pesanan Anda segera diproses.
+                  {isDraft
+                    ? "Pesanan ini tersimpan sebagai draf karena pembayaran belum diselesaikan. Lanjutkan pembayaran selama kuota tanggal kunjungan masih tersedia."
+                    : "Selesaikan pembayaran agar pesanan Anda segera diproses."}
                 </div>
               )}
             </header>
 
             {showPaymentForm && (
-              <PaymentMethodForm orderId={o.id} total={o.total_price} enabledMethods={enabledMethods} />
+              <PaymentMethodForm orderId={o.id} total={o.total_price} enabledMethods={enabledMethods} resume={isDraft} />
             )}
 
             {showPendingNotice && <OrderPendingNotice orderId={o.id} />}

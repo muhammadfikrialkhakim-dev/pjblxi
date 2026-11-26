@@ -59,7 +59,7 @@ export default async function AdminSettingsPage({
           <div>
             <h3 className="text-sm font-semibold text-forest-900">Gambar Latar Banner Halaman</h3>
             <p className="mt-0.5 text-xs text-ink/50">
-              Gambar untuk bagian banner hijau di atas tiap halaman. Kosong = gradasi hijau bawaan. Gunakan foto
+              Gambar untuk bagian banner hijau di atas tiap halaman (termasuk Dashboard Admin). Kosong = gradasi hijau bawaan. Gunakan foto
               lanskap beresolusi baik; teks di atasnya otomatis diberi lapisan gelap supaya tetap terbaca.
             </p>
           </div>
@@ -90,6 +90,13 @@ export default async function AdminSettingsPage({
             defaultValue={settings?.promo_banner_image ?? null}
             maxSizeMB={10}
             minWidth={1920}
+          />
+          <ImageUploadField
+            name="dashboard_banner_image"
+            label="Banner Dashboard Admin"
+            defaultValue={settings?.dashboard_banner_image ?? null}
+            maxSizeMB={10}
+            minWidth={1600}
           />
         </div>
 

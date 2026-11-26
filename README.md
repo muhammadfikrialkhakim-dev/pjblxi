@@ -15,18 +15,28 @@ bisa dipakai/dijual ke agen travel sebagai white-label booking platform.
   pilih metode pembayaran → e-tiket / konfirmasi
 - Riwayat transaksi per akun customer
 
-**Sisi Admin** (role `admin`)
-- Dashboard ringkasan (total pendapatan, jumlah transaksi, wisata aktif)
-- **Kelola Wisata**: data tempat (nama, lokasi, deskripsi, galeri, kategori) — tanpa harga
-- **Kelola Tiket**: paket tiket per wisata (harga, harga coret, kuota/hari, aktif/nonaktif)
-- **Kelola Kategori**: CRUD kategori wisata
-- **Kelola Member**: daftar akun customer + jumlah transaksinya
-- **Kelola Transaksi**: verifikasi pembayaran manual & ubah status transaksi
-- **Laporan**: pendapatan per bulan & wisata terlaris
+**Sisi Pengunjung (tambahan)**
+- Promo & voucher (klaim + pakai saat checkout), wishlist, ulasan (rating, balasan,
+  reaksi, penanda pembelian terverifikasi), e-tiket yang bisa dicetak
+- Pembayaran **Midtrans Snap** (transfer bank, e-wallet, kartu kredit, QRIS) dan
+  notifikasi email status pesanan (Resend, opsional)
+- Pilihan bahasa Indonesia / Inggris, login email atau Google, asisten AI di Hubungi Kami
 
-**Sisi Super Admin** (role `super_admin`) — punya semua akses Admin, ditambah:
-- **Kelola Data Admin**: buat akun admin/super admin baru, ubah role, hapus akun
-- **Kelola Data User**: kelola akun *semua* role (customer, agent, admin, super admin)
+**Sisi Admin** — hanya dua peran yang punya akses panel `/admin`:
+
+| Menu | Super Admin | Admin Wisata |
+|---|---|---|
+| Dashboard, Laporan (PDF bulanan), Transaksi | semua wisata | wisata miliknya saja |
+| Kelola Wisata, Kelola Tiket, Kelola Promo | semua | wisata miliknya saja |
+| Kelola Kategori | ✔ | — |
+| Kelola Data Admin, Kelola Data User | ✔ | — |
+| Pengaturan Situs (nama, kontak, metode bayar, banner) | ✔ | — |
+
+- Satu Admin Wisata hanya memegang **satu** wisata (ditetapkan lewat `wisata.admin_id`,
+  unik per admin).
+- Role `admin` (lama) sengaja **tidak** punya akses panel; akunnya tetap ada di database.
+- Semua tabel admin punya pencarian, filter, pengurutan, dan paginasi (lihat bagian
+  *Tabel Admin* di bawah).
 
 ## Tumpukan Teknologi
 - Next.js 14 (App Router, Server Actions)
@@ -111,10 +121,12 @@ npm run dev
 ```
 Buka http://localhost:3000
 
-### 4. Membuat akun Admin
+### 5. Membuat akun Super Admin pertama
 Setelah mendaftar lewat halaman `/register`, buka Supabase Table Editor →
-tabel `profiles`, ubah kolom `role` pada akun Anda menjadi `admin`. Setelah
-itu Anda bisa mengakses `/admin`.
+tabel `profiles`, ubah kolom `role` pada akun Anda menjadi `super_admin`
+(bukan `admin` — role itu tidak punya akses panel). Setelah itu buka `/admin`.
+Akun Admin Wisata berikutnya dibuat dari menu **Kelola Data Admin**, lalu wisata
+yang ditugaskan dipilih di form Kelola Wisata (kolom Admin Wisata).
 
 ## Struktur Folder Penting
 ```
@@ -125,10 +137,13 @@ app/
   checkout/[orderId]/          # Pemilihan metode pembayaran
   orders/[id]/                 # E-tiket / konfirmasi pesanan
   account/                     # Riwayat transaksi customer
+  checkout/ , api/midtrans/webhook/   # Pembayaran Midtrans + notifikasi status
+  promo/ , wishlist/ , hubungi-kami/    # Promo, wishlist, asisten AI
   admin/
-    spots/                     # Kelola Wisata (info tempat)
-    tiket/                     # Kelola Tiket (paket harga per wisata)
-    transactions/               # Daftar transaksi
+    spots/ tiket/ categories/ promos/   # Kelola Wisata, Tiket, Kategori, Promo
+    transactions/ reports/              # Transaksi & Laporan (PDF bulanan)
+    super/admins , super/users          # Khusus Super Admin
+    settings/                           # Pengaturan Situs (Super Admin)
 components/                    # Komponen UI yang dipakai bersama
 lib/supabase/                  # Client & server Supabase helper
 supabase/schema.sql            # Skema database v2 (wisata + tiket) + RLS + seed data
@@ -147,10 +162,11 @@ supabase/storage_setup.sql     # Bucket Storage 'wisata-images' + policy upload 
    punya tombol unggah langsung dari komputer (gambar sampul + galeri, maks 5MB
    per file), tidak perlu lagi tempel URL manual. Pastikan sudah menjalankan
    `supabase/storage_setup.sql`.
-3. **Multi-tenant / multi-agen**: skema sudah punya kolom `role` (`agent`,
-   `admin`, `customer`) dan `agency_name` di `profiles` sebagai titik awal jika
-   ingin setiap agen travel mengelola destinasinya sendiri — tambahkan kolom
-   `agency_id` di `destinations` dan sesuaikan RLS policy.
+3. **Multi-tenant / multi-agen**: skema sudah punya kolom `role` (`customer`,
+   `agent`, `admin_wisata`, `super_admin`) dan `agency_name` di `profiles`.
+   Model per-wisata sudah berjalan lewat `wisata.admin_id` + RLS
+   `is_wisata_owner()`; untuk multi-agen penuh, tambahkan `agency_id` dan
+   sesuaikan RLS.
 4. **Domain & branding**: ganti nama "Explore Malang", warna, dan logo di
    `tailwind.config.ts` dan `components/Navbar.tsx` / `Footer.tsx` sesuai brand
    agen travel yang akan menggunakan platform ini.
@@ -184,3 +200,11 @@ publik (aturan situs + daftar wisata terbit), tidak bisa melihat pesanan atau
 data pribadi, dan akan mengarahkan ke tim (WhatsApp/Email) untuk refund atau
 masalah akun. Kalau key kosong atau API error, chatbot otomatis memakai
 jawaban berbasis kata kunci bawaan. Ada pembatas 15 pesan/menit per IP.
+
+## Tabel Admin (cari, filter, urut, paginasi)
+Semua tabel admin (Wisata, Tiket, Kategori, Promo, Transaksi, Admin, User) memakai
+pembantu bersama `lib/table-query.ts` dan komponen `TableSearch`, `TableFilter`,
+`SortableTh`, `Pagination`. Kondisi tabel disimpan di URL
+(`?q=&filter=&sort=&dir=&page=&per=`) sehingga bisa di-bookmark. Untuk filter
+tambahan di luar satu `filter` (mis. kategori di Kelola Wisata), sisipkan
+parameternya ke `basePath` (contoh: `/admin/spots?kategori=<uuid>`).

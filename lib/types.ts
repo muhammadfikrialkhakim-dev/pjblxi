@@ -72,7 +72,7 @@ export type Order = {
   discount_amount?: number | null;
   payment_method: "bank_transfer" | "e_wallet" | "credit_card" | "qris" | null;
   payment_status: "pending" | "paid" | "failed" | "expired" | "refunded";
-  order_status: "awaiting_payment" | "confirmed" | "completed" | "cancelled";
+  order_status: "awaiting_payment" | "confirmed" | "completed" | "cancelled" | "draft";
   notes: string | null;
   created_at: string;
   tiket?: Tiket;

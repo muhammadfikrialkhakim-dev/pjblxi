@@ -17,8 +17,10 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import BannerBackground from "@/components/BannerBackground";
+import { getPageBanners } from "@/lib/page-banners";
 import { Order, formatIDR } from "@/lib/types";
-import { syncPendingOrdersWithMidtrans } from "@/lib/midtrans";
+import { draftStaleOrders, syncPendingOrdersWithMidtrans } from "@/lib/midtrans";
 import RevenueChart, { RevenuePoint } from "@/components/RevenueChart";
 
 // Server berjalan di UTC, sedangkan pengguna di WIB (UTC+7). Semua pengelompokan
@@ -111,6 +113,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   if (isWisataAdmin) dashPendingQuery = dashPendingQuery.in("tiket_id", scopeIds);
   const { data: dashStillPending } = await dashPendingQuery;
   await syncPendingOrdersWithMidtrans(supabase, dashStillPending ?? []);
+  await draftStaleOrders();
 
   let recentOrdersQuery = supabase
     .from("orders")
@@ -121,6 +124,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
     .from("orders")
     .select("*, tiket(name, wisata(name))")
     .eq("payment_status", "pending")
+    .neq("order_status", "draft")
     .order("created_at", { ascending: true })
     .limit(5);
   let allOrdersQuery = supabase
@@ -170,7 +174,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   const ticketsCurrent = sumTickets(paidCurrent);
   const ticketsPrevious = sumTickets(paidPrevious);
 
-  const pendingCount = allOrders.filter((o) => o.payment_status === "pending").length;
+  const pendingCount = allOrders.filter((o) => o.payment_status === "pending" && o.order_status !== "draft").length;
 
   const todayOrders = allOrders.filter((o) => orderKey(o) === todayKey);
   const todayRevenue = sumRevenue(todayOrders.filter((o) => o.payment_status === "paid"));
@@ -288,6 +292,8 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
           { href: "/admin/reports", label: "Lihat Laporan Lengkap", icon: FileBarChart },
         ];
 
+  const banners = await getPageBanners();
+
   const todayLabel = new Date().toLocaleDateString("id-ID", {
     weekday: "long",
     day: "numeric",
@@ -298,7 +304,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
 
   return (
     <div className="space-y-6">
-      {/* Banner sambutan */}
+      {/* Banner sambutan — gambar latar bisa diganti Super Admin di Pengaturan Situs */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-forest-900 via-forest-800 to-forest-700 p-6 text-white shadow-lg shadow-forest-900/10 sm:p-8">
         <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-clay-400/25 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 right-24 h-48 w-48 rounded-full bg-forest-300/20 blur-3xl" />
@@ -310,6 +316,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
         >
           <path d="M0 80V45l60-25 70 22 80-34 90 38 70-22 90 30 70-20 70 24v40z" fill="#0d1e13" />
         </svg>
+        <BannerBackground image={banners.dashboard} />
 
         <div className="relative flex flex-wrap items-end justify-between gap-5">
           <div className="max-w-xl">

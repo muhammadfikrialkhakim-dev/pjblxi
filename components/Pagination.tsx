@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { PER_PAGE_OPTIONS, tableHref, type TableParams } from "@/lib/table-query";
+import { tableHref, type TableParams } from "@/lib/table-query";
 
 /** Nomor halaman dengan elipsis: 1 … 4 5 [6] 7 8 … 20 */
 function pageList(current: number, pages: number): (number | "…")[] {
@@ -42,18 +42,6 @@ export default function Pagination({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-ink/60">
         <p>
           {total === 0 ? "Tidak ada data" : `Menampilkan ${offset + 1}–${offset + shown} dari ${total}`}
-        </p>
-        <p className="flex items-center gap-1.5">
-          <span>Per halaman:</span>
-          {PER_PAGE_OPTIONS.map((n) => (
-            <Link
-              key={n}
-              href={tableHref(basePath, params, { per: n, page: 1 })}
-              className={`rounded px-2 py-0.5 ${n === params.per ? "bg-forest-100 font-semibold text-forest-900" : "hover:bg-forest-50"}`}
-            >
-              {n}
-            </Link>
-          ))}
         </p>
       </div>
 

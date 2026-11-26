@@ -67,7 +67,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: R
       <h1 className="font-display text-2xl font-semibold text-forest-900">Kelola Data User</h1>
       <p className="mt-1 text-sm text-ink/60">Akun pengguna (customer & agen). Akun admin dikelola di halaman Kelola Data Admin.</p>
 
-      <div className="mt-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
         <TableSearch basePath={BASE} params={params} placeholder="Cari nama, telepon, atau agensi…" />
         <TableFilter
           basePath={BASE}

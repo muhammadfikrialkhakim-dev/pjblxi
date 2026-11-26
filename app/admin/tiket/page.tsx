@@ -133,7 +133,7 @@ export default async function AdminTiketPage({
         </p>
       )}
 
-      <div className="mt-6 flex flex-col gap-3">
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
         <TableSearch
           basePath={BASE}
           params={params}

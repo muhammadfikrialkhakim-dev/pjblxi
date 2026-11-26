@@ -29,7 +29,7 @@ export const infoPages: Record<Locale, Record<InfoPageKey, InfoPageContent>> = {
           heading: "Pembayaran",
           paragraphs: [
             "Pembayaran diproses lewat Midtrans. Metode yang tersedia dapat berupa transfer bank, e-wallet, kartu kredit, dan QRIS, tergantung pengaturan situs saat ini.",
-            "Jika batas waktu pembayaran terlewat, pesanan dibatalkan otomatis dan Anda perlu membuat pesanan baru.",
+            "Jika batas waktu pembayaran terlewat, pesanan tidak dibatalkan melainkan disimpan sebagai draf dan dapat dilanjutkan dari halaman Pesanan Saya selama kuota masih tersedia.",
           ],
         },
         {
@@ -37,7 +37,7 @@ export const infoPages: Record<Locale, Record<InfoPageKey, InfoPageContent>> = {
           bullets: [
             "Menunggu pembayaran: pesanan dibuat tetapi belum dibayar.",
             "Terkonfirmasi: pembayaran diterima, e-tiket siap dipakai.",
-            "Dibatalkan: pembayaran gagal, dibatalkan, kedaluwarsa, atau direfund.",
+            "Draf: pembayaran tidak diselesaikan sampai batas waktu; pesanan tersimpan dan dapat dilanjutkan. Dibatalkan: pembayaran ditolak, dibatalkan, atau direfund.",
           ],
         },
         {
@@ -68,7 +68,7 @@ export const infoPages: Record<Locale, Record<InfoPageKey, InfoPageContent>> = {
         {
           heading: "2. Pemesanan dan pembayaran",
           paragraphs: [
-            "Pesanan dianggap sah setelah pembayaran diterima melalui penyedia pembayaran. Pesanan yang tidak dibayar sampai batas waktu akan dibatalkan otomatis.",
+            "Pesanan dianggap sah setelah pembayaran diterima melalui penyedia pembayaran. Pesanan yang tidak dibayar sampai batas waktu disimpan sebagai draf dan dapat dilanjutkan selama kuota tersedia.",
             "Harga, ketersediaan, dan informasi tiket ditentukan oleh pengelola masing-masing wisata dan dapat berubah sewaktu-waktu.",
           ],
         },
@@ -155,7 +155,7 @@ export const infoPages: Record<Locale, Record<InfoPageKey, InfoPageContent>> = {
           heading: "Payment",
           paragraphs: [
             "Payments are processed through Midtrans. Available methods may include bank transfer, e-wallet, credit card, and QRIS, depending on the current site settings.",
-            "If the payment deadline passes, the order is cancelled automatically and you will need to place a new one.",
+            "If the payment deadline passes, the order is not cancelled but saved as a draft, and you can resume it from My Orders while tickets remain available.",
           ],
         },
         {
@@ -163,7 +163,7 @@ export const infoPages: Record<Locale, Record<InfoPageKey, InfoPageContent>> = {
           bullets: [
             "Awaiting payment: the order was created but not yet paid.",
             "Confirmed: payment received, e-ticket ready to use.",
-            "Cancelled: payment failed, was cancelled, expired, or was refunded.",
+            "Draft: payment was not completed by the deadline; the order is saved and can be resumed. Cancelled: payment was declined, cancelled, or refunded.",
           ],
         },
         {
@@ -194,7 +194,7 @@ export const infoPages: Record<Locale, Record<InfoPageKey, InfoPageContent>> = {
         {
           heading: "2. Booking and payment",
           paragraphs: [
-            "An order is valid once payment is received through the payment provider. Orders not paid by the deadline are cancelled automatically.",
+            "An order is valid once payment is received through the payment provider. Orders not paid by the deadline are saved as drafts and can be resumed while tickets remain available.",
             "Prices, availability, and ticket information are set by each attraction's operator and may change at any time.",
           ],
         },

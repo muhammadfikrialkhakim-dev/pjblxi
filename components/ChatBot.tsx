@@ -40,11 +40,11 @@ const INTENTS: Intent[] = [
     reply: {
       id: {
         text:
-          "Pembayaran diproses lewat Midtrans. Metode yang tersedia bisa berupa transfer bank, e-wallet, kartu kredit, dan QRIS (sesuai yang diaktifkan saat ini). Kalau batas waktu pembayaran terlewat, pesanan dibatalkan otomatis dan Anda perlu membuat pesanan baru.",
+          "Pembayaran diproses lewat Midtrans. Metode yang tersedia bisa berupa transfer bank, e-wallet, kartu kredit, dan QRIS (sesuai yang diaktifkan saat ini). Kalau batas waktu pembayaran terlewat, pesanan tidak dibatalkan tetapi disimpan sebagai draf; Anda bisa melanjutkan pembayarannya dari halaman Pesanan Saya selama kuota tanggal kunjungan masih tersedia.",
       },
       en: {
         text:
-          "Payments are processed through Midtrans. Available methods may include bank transfer, e-wallet, credit card, and QRIS (depending on what is currently enabled). If the payment deadline passes, the order is cancelled automatically and you'll need to place a new one.",
+          "Payments are processed through Midtrans. Available methods may include bank transfer, e-wallet, credit card, and QRIS (depending on what is currently enabled). If the payment deadline passes, the order is not cancelled but saved as a draft; you can resume payment from My Orders as long as tickets for your visit date are still available.",
       },
     },
   },
@@ -68,12 +68,12 @@ const INTENTS: Intent[] = [
     reply: {
       id: {
         text:
-          "Arti status pesanan:\n• Menunggu pembayaran: pesanan dibuat tapi belum dibayar.\n• Selesai: pembayaran diterima, e-tiket siap dipakai.\n• Dibatalkan: pembayaran gagal, dibatalkan, kedaluwarsa, atau direfund.\nKami mengirim email setiap status pembayaran berubah; cek folder spam kalau belum masuk.",
+          "Arti status pesanan:\n• Menunggu pembayaran: pesanan dibuat tapi belum dibayar.\n• Draf: pembayaran tidak diselesaikan sampai batas waktu; pesanan tersimpan dan bisa dilanjutkan.\n• Selesai: pembayaran diterima, e-tiket siap dipakai.\n• Dibatalkan: pembayaran ditolak, dibatalkan, atau direfund.\nKami mengirim email setiap status pembayaran berubah; cek folder spam kalau belum masuk.",
         links: [{ label: "Pesanan Saya", href: "/account" }],
       },
       en: {
         text:
-          "Order statuses:\n• Awaiting payment: the order was created but not paid yet.\n• Completed: payment received, e-ticket ready.\n• Cancelled: payment failed, was cancelled, expired, or refunded.\nWe email you whenever a payment status changes; check your spam folder if nothing arrives.",
+          "Order statuses:\n• Awaiting payment: the order was created but not paid yet.\n• Draft: payment was not completed by the deadline; the order is saved and can be resumed.\n• Completed: payment received, e-ticket ready.\n• Cancelled: payment was declined, cancelled, or refunded.\nWe email you whenever a payment status changes; check your spam folder if nothing arrives.",
         links: [{ label: "My Orders", href: "/account" }],
       },
     },

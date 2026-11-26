@@ -41,6 +41,7 @@ export default function PaymentMethodForm({
   orderId,
   total,
   enabledMethods,
+  resume = false,
 }: {
   orderId: string;
   total: number;
@@ -49,6 +50,8 @@ export default function PaymentMethodForm({
   // belum ada / gagal diambil), tampilkan SEMUA metode seperti sebelumnya
   // supaya checkout tidak tiba-tiba kosong.
   enabledMethods?: MethodId[];
+  // true = pesanan berstatus draf yang dilanjutkan pembayarannya.
+  resume?: boolean;
 }) {
   const router = useRouter();
   const availableMethods = enabledMethods ? METHODS.filter((m) => enabledMethods.includes(m.id)) : METHODS;
@@ -90,9 +93,11 @@ export default function PaymentMethodForm({
             setError("Pembayaran gagal diproses. Silakan coba lagi atau pilih metode lain.");
           },
           onClose: () => {
-            // Popup ditutup sebelum pembayaran selesai. Status order tetap
-            // 'pending' — beri tahu pengunjung bahwa ia bisa mencoba lagi.
-            setNotice("Pembayaran belum diselesaikan. Anda bisa mencobanya lagi kapan saja.");
+            // Popup ditutup sebelum pembayaran selesai. Pesanan tidak dibatalkan:
+            // jika batas waktu lewat tanpa dibayar, pesanan disimpan sebagai draf.
+            setNotice(
+              "Pembayaran belum diselesaikan. Pesanan Anda tidak dibatalkan — jika tidak dibayar sampai batas waktu, pesanan disimpan sebagai draf dan bisa dilanjutkan dari halaman Pesanan Saya."
+            );
           },
         });
       } catch (err) {
@@ -187,7 +192,7 @@ export default function PaymentMethodForm({
           className="flex w-full items-center justify-center gap-2 rounded-full bg-clay-500 px-6 py-3.5 text-base font-semibold text-white shadow-sm ring-2 ring-clay-200 ring-offset-2 transition hover:bg-clay-600 focus-visible:outline-none focus-visible:ring-clay-400 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Lock className="h-4 w-4" aria-hidden />
-          {isPending ? "Memproses…" : !snapReady ? "Menyiapkan pembayaran…" : "Bayar Sekarang"}
+          {isPending ? "Memproses…" : !snapReady ? "Menyiapkan pembayaran…" : resume ? "Lanjutkan Pembayaran" : "Bayar Sekarang"}
         </button>
         <p className="mt-3 text-center text-xs text-ink/50">Pembayaran diproses dengan aman melalui Midtrans.</p>
       </div>

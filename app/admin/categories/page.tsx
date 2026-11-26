@@ -54,7 +54,7 @@ export default async function AdminCategoriesPage({ searchParams }: { searchPara
         </Link>
       </div>
 
-      <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
         <TableSearch basePath={BASE} params={params} placeholder="Cari nama atau slug kategori…" />
         <TableFilter
           basePath={BASE}

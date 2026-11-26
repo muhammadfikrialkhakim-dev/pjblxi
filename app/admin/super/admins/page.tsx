@@ -81,7 +81,7 @@ export default async function AdminAccountsPage({ searchParams }: { searchParams
         Akun dengan akses ke panel admin. Super Admin punya akses tambahan mengelola akun & user.
       </p>
 
-      <div className="mt-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
         <TableSearch basePath={BASE} params={params} placeholder="Cari nama, wisata, atau telepon…" />
         <TableFilter
           basePath={BASE}

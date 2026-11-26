@@ -490,3 +490,10 @@ input::-ms-clear {
     display: none !important;
   }
 }
+
+/* Semua tombol memakai HURUF KAPITAL. Memakai :where() agar spesifisitasnya 0:
+   kalau suatu tombol perlu pengecualian, cukup beri class `normal-case`. */
+:where(button, [role="button"], .btn-primary, .btn-secondary, input[type="submit"], input[type="button"]) {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}

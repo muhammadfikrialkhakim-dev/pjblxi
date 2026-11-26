@@ -46,6 +46,19 @@ export async function createSnapToken(orderId: string, method: string): Promise<
       throw new UserFacingError("Pesanan ini sudah dibatalkan atau kedaluwarsa. Silakan buat pesanan baru.");
     }
 
+    const isDraft = o.order_status === "draft";
+
+    // Draf tidak menahan kuota, jadi saat dilanjutkan periksa lagi apakah
+    // tiket untuk tanggal kunjungan itu masih cukup.
+    if (isDraft) {
+      const { data: left } = await supabase.rpc("tiket_remaining", { p_tiket: o.tiket_id, p_date: o.visit_date });
+      if (typeof left === "number" && left < o.ticket_quantity) {
+        throw new UserFacingError(
+          "Kuota tiket untuk tanggal kunjungan ini sudah tidak mencukupi, sehingga draf tidak bisa dilanjutkan. Silakan buat pesanan baru dengan tanggal lain."
+        );
+      }
+    }
+
     const admin = createAdminClient();
 
     // Sebelum membuat percobaan bayar baru, periksa percobaan sebelumnya:
@@ -71,7 +84,10 @@ export async function createSnapToken(orderId: string, method: string): Promise<
       if (previous) {
         const mapped = mapMidtransStatus(previous.transaction_status, previous.fraud_status);
         if (mapped.payment_status === "paid") throw new UserFacingError("Pembayaran untuk pesanan ini sudah kami terima.");
-        if (mapped.payment_status === "failed" || mapped.payment_status === "expired") {
+        // Percobaan sebelumnya yang kedaluwarsa/dibatalkan (pengunjung tidak jadi
+        // membayar) boleh dilanjutkan dengan transaksi baru; hanya pembayaran
+        // yang ditolak yang menutup pesanan.
+        if (previous.transaction_status === "deny" || previous.transaction_status === "failure") {
           throw new UserFacingError("Pesanan ini sudah dibatalkan atau kedaluwarsa. Silakan buat pesanan baru.");
         }
       }
@@ -143,7 +159,12 @@ export async function createSnapToken(orderId: string, method: string): Promise<
     // pesanannya. Kepemilikan pesanan sudah dipastikan query RLS di atas.
     const { error: saveError } = await admin
       .from("orders")
-      .update({ payment_method: method, midtrans_order_id: midtransOrderId })
+      .update({
+        payment_method: method,
+        midtrans_order_id: midtransOrderId,
+        // Draf yang dilanjutkan kembali menjadi "menunggu pembayaran" dan menahan kuota lagi.
+        ...(isDraft ? { order_status: "awaiting_payment", hold_started_at: new Date().toISOString() } : {}),
+      })
       .eq("id", orderId);
     if (saveError) throw new Error(`Gagal menyimpan data pembayaran: ${saveError.message}`);
 

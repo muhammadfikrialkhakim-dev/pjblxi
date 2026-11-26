@@ -4,17 +4,28 @@ import { redirect } from "next/navigation";
 import { CreditCard, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Order, formatIDR } from "@/lib/types";
+import { draftStaleOrders } from "@/lib/midtrans";
 
 const statusStyles: Record<Order["order_status"], string> = {
   awaiting_payment: "bg-clay-100 text-clay-700",
   confirmed: "bg-forest-100 text-forest-800",
   completed: "bg-forest-100 text-forest-800",
   cancelled: "bg-red-100 text-red-700",
+  draft: "bg-slate-100 text-slate-700",
+};
+
+const statusLabel: Record<Order["order_status"], string> = {
+  awaiting_payment: "Menunggu Pembayaran",
+  confirmed: "Terkonfirmasi",
+  completed: "Selesai",
+  cancelled: "Dibatalkan",
+  draft: "Draf",
 };
 
 const FILTER_TABS: { value: Order["order_status"] | "all"; label: string }[] = [
   { value: "all", label: "Semua" },
   { value: "awaiting_payment", label: "Menunggu Pembayaran" },
+  { value: "draft", label: "Draf" },
   { value: "confirmed", label: "Terkonfirmasi" },
   { value: "completed", label: "Selesai" },
   { value: "cancelled", label: "Dibatalkan" },
@@ -37,6 +48,9 @@ export default async function AccountOrdersPage({
   // link redirectTo basi), tetap arahkan ke dashboard admin.
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (profile?.role === "admin" || profile?.role === "admin_wisata" || profile?.role === "super_admin") redirect("/admin");
+
+  // Pesanan yang menggantung >60 menit tanpa transaksi pembayaran -> draf.
+  await draftStaleOrders();
 
   const validStatuses = FILTER_TABS.map((f) => f.value).filter((v) => v !== "all");
   const activeStatus =
@@ -82,7 +96,8 @@ export default async function AccountOrdersPage({
 
       <div className="mt-6 space-y-4">
         {(orders as Order[] | null)?.map((o) => {
-          const needsPayment = o.order_status === "awaiting_payment" && o.payment_status !== "paid";
+          const isDraft = o.order_status === "draft" && o.payment_status !== "paid";
+          const needsPayment = (o.order_status === "awaiting_payment" || isDraft) && o.payment_status !== "paid";
           return (
             <Link
               key={o.id}
@@ -103,13 +118,13 @@ export default async function AccountOrdersPage({
               <div className="flex flex-col items-end gap-1.5">
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${statusStyles[o.order_status]}`}>
-                    {needsPayment && (
+                    {needsPayment && !isDraft && (
                       <span className="relative flex h-2 w-2">
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-clay-500 opacity-75" />
                         <span className="relative inline-flex h-2 w-2 rounded-full bg-clay-600" />
                       </span>
                     )}
-                    {o.order_status.replace("_", " ")}
+                    {statusLabel[o.order_status]}
                   </span>
                   {needsPayment && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-clay-500 px-3 py-1 text-xs font-semibold text-white shadow-sm transition-colors group-hover:bg-clay-600">

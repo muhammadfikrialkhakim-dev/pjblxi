@@ -1,40 +1,23 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  Ticket,
-  Search,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { Plus, Pencil, Trash2, Ticket } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import ConfirmSubmitButton from "@/components/ConfirmSubmitButton";
+import TableSearch from "@/components/TableSearch";
+import SortableTh from "@/components/SortableTh";
+import Pagination from "@/components/Pagination";
+import TableFilter from "@/components/TableFilter";
+import TableSelect from "@/components/TableSelect";
+import { paginate, parseTableParams, tableHref, type RawParams } from "@/lib/table-query";
 import { deleteWisata } from "./actions";
 
-// ─── Parameter URL ──────────────────────────────────────────────────────
 // Semua kondisi tabel (cari, filter, urutan, halaman) disimpan di URL, jadi
-// bisa di-bookmark/dibagikan dan tombol Back browser tetap bekerja.
+// bisa di-bookmark/dibagikan dan tombol Back browser tetap bekerja. Logikanya
+// memakai pembantu bersama (lib/table-query + komponen Table*), sama seperti
+// halaman Kelola Tiket / Kategori / Promo.
 const SORT_KEYS = ["created", "name", "location", "category", "tiket", "status"] as const;
-type SortKey = (typeof SORT_KEYS)[number];
-type Dir = "asc" | "desc";
-const PAGE_SIZES = [10, 25, 50] as const;
-const STATUSES = ["published", "draft", "archived"] as const;
+const FILTER_KEYS = ["published", "draft", "archived"] as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-type SearchParams = {
-  q?: string;
-  status?: string;
-  kategori?: string;
-  sort?: string;
-  dir?: string;
-  per?: string;
-  page?: string;
-};
 
 type Row = {
   id: string;
@@ -48,7 +31,7 @@ type Row = {
 
 const collator = new Intl.Collator("id", { sensitivity: "base", numeric: true });
 
-function sortValue(r: Row, key: SortKey): string | number {
+function sortValue(r: Row, key: (typeof SORT_KEYS)[number]): string | number {
   switch (key) {
     case "name":
       return r.name ?? "";
@@ -65,20 +48,11 @@ function sortValue(r: Row, key: SortKey): string | number {
   }
 }
 
-/** Daftar nomor halaman dengan elipsis, mis. 1 … 4 5 6 … 12 */
-function pageList(current: number, total: number): (number | "…")[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const pages = new Set([1, total, current - 1, current, current + 1]);
-  const sorted = [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
-  const out: (number | "…")[] = [];
-  sorted.forEach((p, i) => {
-    if (i > 0 && p - sorted[i - 1] > 1) out.push("…");
-    out.push(p);
-  });
-  return out;
-}
-
-export default async function AdminSpotsPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function AdminSpotsPage({
+  searchParams,
+}: {
+  searchParams: RawParams & { kategori?: string };
+}) {
   const supabase = createClient();
   const {
     data: { user },
@@ -96,17 +70,19 @@ export default async function AdminSpotsPage({ searchParams }: { searchParams: S
     redirect(ownWisata ? `/admin/spots/${ownWisata.id}` : "/admin/spots/unassigned");
   }
 
-  // ─── Baca & validasi parameter ────────────────────────────────────────
-  const q = (searchParams.q ?? "").trim().slice(0, 100);
-  const status = (STATUSES as readonly string[]).includes(searchParams.status ?? "") ? (searchParams.status as string) : "";
+  const params = parseTableParams(searchParams, {
+    sortKeys: SORT_KEYS,
+    defaultSort: "created",
+    defaultDir: "desc",
+    filterKeys: FILTER_KEYS,
+  });
   const kategori = UUID_RE.test(searchParams.kategori ?? "") ? (searchParams.kategori as string) : "";
-  const sort: SortKey = (SORT_KEYS as readonly string[]).includes(searchParams.sort ?? "")
-    ? (searchParams.sort as SortKey)
-    : "created";
-  const dir: Dir = searchParams.dir === "asc" || searchParams.dir === "desc" ? searchParams.dir : sort === "created" ? "desc" : "asc";
-  const per = (PAGE_SIZES as readonly number[]).includes(Number(searchParams.per)) ? Number(searchParams.per) : PAGE_SIZES[0];
+  // Kategori terpilih dibawa terus lewat basePath saat cari/urut/pindah halaman.
+  const baseFor = (kat: string) => (kat ? `/admin/spots?kategori=${kat}` : "/admin/spots");
+  const BASE = baseFor(kategori);
 
-  // ─── Ambil data (cari & filter dikerjakan database) ───────────────────
+  // Cari & kategori dikerjakan database; filter status & urutan di bawah
+  // (supaya jumlah per status bisa ditampilkan di pil filter).
   let query = supabase
     .from("wisata")
     .select("id, name, location, status, created_at, category:categories(name), tiket(id)")
@@ -114,9 +90,8 @@ export default async function AdminSpotsPage({ searchParams }: { searchParams: S
 
   // Karakter khusus filter PostgREST dibuang supaya input tidak bisa
   // menyisipkan kondisi tambahan ke dalam .or().
-  const safeQ = q.replace(/[%,()*\\]/g, " ").replace(/\s+/g, " ").trim();
+  const safeQ = params.q.replace(/[%,()*\\]/g, " ").replace(/\s+/g, " ").trim();
   if (safeQ) query = query.or(`name.ilike.%${safeQ}%,location.ilike.%${safeQ}%`);
-  if (status) query = query.eq("status", status);
   if (kategori) query = query.eq("category_id", kategori);
 
   const [{ data: rawRows }, { data: categories }] = await Promise.all([
@@ -124,13 +99,17 @@ export default async function AdminSpotsPage({ searchParams }: { searchParams: S
     supabase.from("categories").select("id, name").order("name"),
   ]);
 
-  // ─── Urutkan & potong halaman ─────────────────────────────────────────
-  // Diurutkan di sini (bukan di database) karena "Jumlah Paket Tiket" adalah
-  // hasil hitungan relasi. Jumlah wisata kecil, jadi ini murah.
-  const rows = [...((rawRows ?? []) as unknown as Row[])]
-    .sort((a, b) => {
-    const va = sortValue(a, sort);
-    const vb = sortValue(b, sort);
+  const searched = (rawRows ?? []) as unknown as Row[];
+  const countOf = (s: string) => searched.filter((r) => r.status === s).length;
+  const filtered = searched.filter((r) => (params.filter ? r.status === params.filter : true));
+
+  // Diurutkan di sini (bukan di database) karena "Paket Tiket" adalah hasil
+  // hitungan relasi. Jumlah wisata kecil, jadi ini murah.
+  const dirMul = params.dir === "asc" ? 1 : -1;
+  const sortKey = params.sort as (typeof SORT_KEYS)[number];
+  filtered.sort((a, b) => {
+    const va = sortValue(a, sortKey);
+    const vb = sortValue(b, sortKey);
     let cmp: number;
     if (typeof va === "number" && typeof vb === "number") cmp = va - vb;
     else {
@@ -140,60 +119,11 @@ export default async function AdminSpotsPage({ searchParams }: { searchParams: S
       cmp = collator.compare(String(va), String(vb));
     }
     if (cmp === 0) return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    return dir === "asc" ? cmp : -cmp;
+    return cmp * dirMul;
   });
 
-  const total = rows.length;
-  const totalPages = Math.max(1, Math.ceil(total / per));
-  const page = Math.min(Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1), totalPages);
-  const offset = (page - 1) * per;
-  const visible = rows.slice(offset, offset + per);
-
-  // ─── Pembuat link: pertahankan parameter lain, buang yang bernilai bawaan ──
-  function href(overrides: Partial<Record<keyof SearchParams, string | number>>) {
-    const next: Record<string, string> = {
-      q,
-      status,
-      kategori,
-      sort: sort === "created" && dir === "desc" ? "" : sort,
-      dir: sort === "created" && dir === "desc" ? "" : dir,
-      per: per === PAGE_SIZES[0] ? "" : String(per),
-      page: page === 1 ? "" : String(page),
-    };
-    for (const [k, v] of Object.entries(overrides)) next[k] = String(v ?? "");
-    const qs = new URLSearchParams();
-    for (const [k, v] of Object.entries(next)) if (v) qs.set(k, v);
-    const s = qs.toString();
-    return s ? `/admin/spots?${s}` : "/admin/spots";
-  }
-
-  function sortHref(key: SortKey) {
-    const nextDir: Dir = sort === key ? (dir === "asc" ? "desc" : "asc") : key === "created" ? "desc" : "asc";
-    return href({ sort: key, dir: nextDir, page: 1 });
-  }
-
-  function SortHeader({ label, k, className = "" }: { label: string; k: SortKey; className?: string }) {
-    const active = sort === k;
-    const Icon = !active ? ArrowUpDown : dir === "asc" ? ArrowUp : ArrowDown;
-    return (
-      <th
-        className={`px-4 py-3 font-medium ${className}`}
-        aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
-      >
-        <Link
-          href={sortHref(k)}
-          className={`inline-flex items-center gap-1.5 hover:text-forest-800 ${active ? "text-forest-800" : ""}`}
-        >
-          {label}
-          <Icon className={`h-3.5 w-3.5 ${active ? "" : "opacity-40"}`} aria-hidden />
-        </Link>
-      </th>
-    );
-  }
-
-  const filtering = Boolean(q || status || kategori);
-  const firstShown = total ? offset + 1 : 0;
-  const lastShown = offset + visible.length;
+  const { rows, total, pages, page, offset } = paginate(filtered, params);
+  const filtering = Boolean(params.q || params.filter || kategori);
 
   return (
     <div>
@@ -209,85 +139,54 @@ export default async function AdminSpotsPage({ searchParams }: { searchParams: S
         Data tempat wisata. Harga & paket tiket diatur terpisah di menu <strong>Kelola Tiket</strong>.
       </p>
 
-      {/* 1 · Pencarian  2 · Filter */}
-      <form action="/admin/spots" method="get" className="mt-6 flex flex-wrap items-end gap-3" role="search">
-        <div className="min-w-[220px] flex-1">
-          <label htmlFor="q" className="sr-only">
-            Cari wisata
-          </label>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" aria-hidden />
-            <input
-              id="q"
-              name="q"
-              type="search"
-              defaultValue={q}
-              placeholder="Cari nama atau lokasi wisata…"
-              className="input-field !pl-10"
-              maxLength={100}
-            />
-          </div>
-        </div>
-        <div>
-          <label htmlFor="kategori" className="sr-only">
-            Kategori
-          </label>
-          <select id="kategori" name="kategori" defaultValue={kategori} className="input-field">
-            <option value="">Semua kategori</option>
-            {categories?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="status" className="sr-only">
-            Status
-          </label>
-          <select id="status" name="status" defaultValue={status} className="input-field">
-            <option value="">Semua status</option>
-            <option value="published">Published</option>
-            <option value="draft">Draft</option>
-            <option value="archived">Archived</option>
-          </select>
-        </div>
-        {/* Urutan & ukuran halaman ikut terbawa saat mencari/memfilter. */}
-        {sort !== "created" || dir !== "desc" ? (
-          <>
-            <input type="hidden" name="sort" value={sort} />
-            <input type="hidden" name="dir" value={dir} />
-          </>
-        ) : null}
-        {per !== PAGE_SIZES[0] && <input type="hidden" name="per" value={per} />}
-        <button type="submit" className="btn-primary">
-          Terapkan
-        </button>
-        {filtering && (
-          <Link href={href({ q: "", status: "", kategori: "", page: 1 })} className="btn-secondary">
-            Reset
-          </Link>
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+        <TableSearch
+          basePath={BASE}
+          params={params}
+          placeholder="Cari nama atau lokasi wisata…"
+          hidden={kategori ? { kategori } : undefined}
+        />
+        <TableFilter
+          basePath={BASE}
+          params={params}
+          label="Status"
+          options={[
+            { value: "", label: "Semua", count: searched.length },
+            { value: "published", label: "Published", count: countOf("published") },
+            { value: "draft", label: "Draft", count: countOf("draft") },
+            { value: "archived", label: "Archived", count: countOf("archived") },
+          ]}
+        />
+        {/* Filter kategori: dropdown, mempertahankan cari/status/urutan. */}
+        {!!categories?.length && (
+          <TableSelect
+            label="Kategori"
+            value={kategori}
+            options={[{ id: "", name: "Semua" }, ...categories].map((c) => ({
+              value: c.id,
+              label: c.name,
+              href: tableHref(baseFor(c.id), params, { page: 1 }),
+            }))}
+          />
         )}
-      </form>
+      </div>
 
       <div className="card mt-4 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-forest-50 text-ink/60">
               <tr>
-                {/* 5 · Penomoran baris */}
                 <th className="w-14 px-4 py-3 font-medium">No.</th>
-                {/* 3 · Pengurutan */}
-                <SortHeader label="Nama" k="name" />
-                <SortHeader label="Lokasi" k="location" />
-                <SortHeader label="Kategori" k="category" />
-                <SortHeader label="Paket Tiket" k="tiket" />
-                <SortHeader label="Status" k="status" />
+                <SortableTh basePath={BASE} params={params} sortKey="name">Nama</SortableTh>
+                <SortableTh basePath={BASE} params={params} sortKey="location">Lokasi</SortableTh>
+                <SortableTh basePath={BASE} params={params} sortKey="category">Kategori</SortableTh>
+                <SortableTh basePath={BASE} params={params} sortKey="tiket">Paket Tiket</SortableTh>
+                <SortableTh basePath={BASE} params={params} sortKey="status">Status</SortableTh>
                 <th className="px-4 py-3 text-right font-medium">Aksi</th>
               </tr>
             </thead>
             <tbody>
-              {visible.map((w, i) => (
+              {rows.map((w, i) => (
                 <tr key={w.id} className="border-t border-forest-50">
                   <td className="px-4 py-3 tabular-nums text-ink/50">{offset + i + 1}</td>
                   <td className="px-4 py-3 font-medium text-forest-900">{w.name}</td>
@@ -296,7 +195,7 @@ export default async function AdminSpotsPage({ searchParams }: { searchParams: S
                   <td className="px-4 py-3 text-ink/70">{w.tiket?.length ?? 0} paket</td>
                   <td className="px-4 py-3">
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide ${
                         w.status === "published" ? "bg-forest-100 text-forest-800" : "bg-ink/10 text-ink/60"
                       }`}
                     >
@@ -328,7 +227,7 @@ export default async function AdminSpotsPage({ searchParams }: { searchParams: S
                   </td>
                 </tr>
               ))}
-              {!visible.length && (
+              {!rows.length && (
                 <tr>
                   <td colSpan={7} className="px-4 py-10 text-center text-ink/50">
                     {filtering ? (
@@ -347,77 +246,7 @@ export default async function AdminSpotsPage({ searchParams }: { searchParams: S
             </tbody>
           </table>
         </div>
-
-        {/* 4 · Penomoran halaman */}
-        {total > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-forest-50 px-4 py-3 text-sm text-ink/60">
-            <p>
-              Menampilkan <strong className="text-ink">{firstShown}–{lastShown}</strong> dari{" "}
-              <strong className="text-ink">{total}</strong> wisata
-            </p>
-
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-1.5">
-                <span>Per halaman</span>
-                {PAGE_SIZES.map((n) => (
-                  <Link
-                    key={n}
-                    href={href({ per: n === PAGE_SIZES[0] ? "" : n, page: 1 })}
-                    aria-current={n === per ? "true" : undefined}
-                    className={`rounded px-2 py-1 font-medium ${
-                      n === per ? "bg-forest-600 text-white" : "text-forest-800 hover:bg-forest-50"
-                    }`}
-                  >
-                    {n}
-                  </Link>
-                ))}
-              </div>
-
-              {totalPages > 1 && (
-                <nav aria-label="Halaman" className="flex items-center gap-1">
-                  {page > 1 ? (
-                    <Link href={href({ page: page - 1 })} className="rounded p-1.5 text-forest-800 hover:bg-forest-50" aria-label="Halaman sebelumnya">
-                      <ChevronLeft className="h-4 w-4" />
-                    </Link>
-                  ) : (
-                    <span className="rounded p-1.5 text-ink/25" aria-hidden>
-                      <ChevronLeft className="h-4 w-4" />
-                    </span>
-                  )}
-
-                  {pageList(page, totalPages).map((p, i) =>
-                    p === "…" ? (
-                      <span key={`gap-${i}`} className="px-1 text-ink/40">
-                        …
-                      </span>
-                    ) : (
-                      <Link
-                        key={p}
-                        href={href({ page: p })}
-                        aria-current={p === page ? "page" : undefined}
-                        className={`min-w-[2rem] rounded px-2 py-1 text-center font-medium tabular-nums ${
-                          p === page ? "bg-forest-600 text-white" : "text-forest-800 hover:bg-forest-50"
-                        }`}
-                      >
-                        {p}
-                      </Link>
-                    )
-                  )}
-
-                  {page < totalPages ? (
-                    <Link href={href({ page: page + 1 })} className="rounded p-1.5 text-forest-800 hover:bg-forest-50" aria-label="Halaman berikutnya">
-                      <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  ) : (
-                    <span className="rounded p-1.5 text-ink/25" aria-hidden>
-                      <ChevronRight className="h-4 w-4" />
-                    </span>
-                  )}
-                </nav>
-              )}
-            </div>
-          </div>
-        )}
+        <Pagination basePath={BASE} params={params} total={total} pages={pages} page={page} offset={offset} shown={rows.length} />
       </div>
     </div>
   );

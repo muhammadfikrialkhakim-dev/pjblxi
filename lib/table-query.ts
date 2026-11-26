@@ -1,7 +1,7 @@
 /**
  * Pembantu pencarian + pengurutan + paginasi tabel admin yang berbasis URL
  * (?q=…&sort=…&dir=…&page=…&per=…). Dipakai bersama komponen TableSearch,
- * SortableTh, dan Pagination — semuanya server component, tanpa JS di browser.
+ * SortableTh, dan Pagination — TableSelect (dropdown filter) adalah client component kecil, sisanya server component.
  */
 
 export type TableParams = {

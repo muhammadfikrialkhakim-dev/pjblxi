@@ -10,6 +10,7 @@ const STATUS_OPTIONS: Order["order_status"][] = [
   "confirmed",
   "completed",
   "cancelled",
+  "draft",
 ];
 
 const statusLabel: Record<Order["order_status"], string> = {
@@ -17,6 +18,7 @@ const statusLabel: Record<Order["order_status"], string> = {
   confirmed: "Terkonfirmasi",
   completed: "Selesai",
   cancelled: "Dibatalkan",
+  draft: "Draf",
 };
 
 /** Warna per status agar mudah dibedakan sekilas. */
@@ -25,6 +27,7 @@ const statusColor: Record<Order["order_status"], string> = {
   confirmed: "border-sky-300 bg-sky-50 text-sky-800 focus:ring-sky-200",
   completed: "border-emerald-300 bg-emerald-50 text-emerald-800 focus:ring-emerald-200",
   cancelled: "border-red-300 bg-red-50 text-red-700 focus:ring-red-200",
+  draft: "border-slate-300 bg-slate-50 text-slate-700 focus:ring-slate-200",
 };
 
 export default function TransactionRowActions({ order }: { order: Order }) {

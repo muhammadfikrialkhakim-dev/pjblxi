@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Order, formatIDR } from "@/lib/types";
-import { syncPendingOrdersWithMidtrans } from "@/lib/midtrans";
+import { draftStaleOrders, syncPendingOrdersWithMidtrans } from "@/lib/midtrans";
 import TransactionRowActions from "@/components/TransactionRowActions";
 import TableSearch from "@/components/TableSearch";
 import SortableTh from "@/components/SortableTh";
@@ -73,6 +73,7 @@ export default async function AdminTransactionsPage({
   if (isWisataAdmin) pendingQuery = pendingQuery.in("tiket_id", scopeIds);
   const { data: stillPending } = await pendingQuery;
   await syncPendingOrdersWithMidtrans(supabase, stillPending ?? []);
+  await draftStaleOrders();
 
   let query = supabase.from("orders").select("*, tiket(name, wisata(name))");
   if (isWisataAdmin) {
@@ -116,7 +117,7 @@ export default async function AdminTransactionsPage({
         Verifikasi pembayaran manual atau ubah status transaksi bila diperlukan.
       </p>
 
-      <div className="mt-6 flex flex-col gap-3">
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
         <TableSearch basePath={BASE} params={params} placeholder="Cari kode, pelanggan, atau destinasi…" />
         <TableFilter
           basePath={BASE}
